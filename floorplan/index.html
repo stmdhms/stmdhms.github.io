@@ -2,53 +2,74 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Floor Plan Capture</title>
 <meta name="robots" content="noindex">
 <style>
-  :root { --bg:#111418; --panel:rgba(20,24,30,.86); --fg:#eef1f5; --mut:#9aa4b2; --acc:#4fa3ff; --ok:#3fcf7f; --warn:#ffb020; --bad:#ff5a5a; --light:#ffd84a; }
+  :root { --bg:#111418; --panel:rgba(20,24,30,.88); --fg:#eef1f5; --mut:#9aa4b2; --acc:#4fa3ff; --ok:#3fcf7f; --warn:#ffb020; --bad:#ff5a5a; --light:#ffd84a; --vvh:100vh; }
   * { box-sizing:border-box; }
   html, body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.4 system-ui, -apple-system, Roboto, sans-serif; }
   button, select, input, textarea { font:inherit; color:inherit; }
-  button { background:#2a3240; border:1px solid #3b4556; border-radius:10px; padding:10px 14px; min-height:44px; }
+  button { background:#2a3240; border:1px solid #3b4556; border-radius:10px; padding:10px 14px; min-height:48px; touch-action:manipulation; }
   button.primary { background:var(--acc); border-color:var(--acc); color:#06121f; font-weight:600; }
-  button.big { font-size:20px; padding:14px 22px; min-height:58px; }
+  button.big { font-size:20px; padding:14px 22px; min-height:60px; }
+  button.danger { border-color:#7a2a2a; color:#ffb4b4; }
   button:disabled { opacity:.4; }
-  select, input[type=text], textarea { background:#1b2129; border:1px solid #3b4556; border-radius:10px; padding:10px; min-height:44px; width:100%; }
+  select, input[type=text], input[type=number], textarea { background:#1b2129; border:1px solid #3b4556; border-radius:10px; padding:10px; min-height:48px; width:100%; }
   .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .row > * { flex:1 1 auto; }
+  .row > .narrow { flex:0 1 auto; }
   .mut { color:var(--mut); font-size:14px; }
+  .seg { display:flex; gap:0; }
+  .seg button { flex:1; border-radius:0; min-height:44px; }
+  .seg button:first-child { border-radius:10px 0 0 10px; }
+  .seg button:last-child { border-radius:0 10px 10px 0; }
+  .seg button.on { background:#3b5e8a; border-color:var(--acc); font-weight:600; }
   #app { min-height:100vh; }
   /* ---- landing ---- */
-  #landing { padding:16px; max-width:640px; margin:0 auto; }
+  #landing { padding:16px; max-width:760px; margin:0 auto; }
   #landing h1 { font-size:22px; margin:8px 0 4px; }
   #landing section { background:#181d24; border:1px solid #262e3a; border-radius:14px; padding:12px; margin:12px 0; }
   #landing h2 { font-size:16px; margin:0 0 8px; }
-  #mapWrapLanding canvas { width:100%; aspect-ratio:1/1; background:#0c0f13; border-radius:10px; display:block; }
-  ul.items { margin:6px 0 0; padding-left:18px; font-size:14px; }
+  #editCanvas { width:100%; aspect-ratio:1/1; max-height:75vh; background:#0c0f13; border-radius:10px; display:block; touch-action:none; }
+  #selPanel { margin-top:8px; background:#11161c; border-radius:10px; padding:10px; min-height:48px; }
+  .help ol { margin:6px 0; padding-left:20px; } .help li { margin:4px 0; }
+  details summary { cursor:pointer; font-weight:600; min-height:32px; }
   /* ---- AR overlay ---- */
   #ar { display:none; position:fixed; inset:0; pointer-events:none; }
   #app.in-ar #landing { display:none; }
   #app.in-ar #ar { display:block; }
   #app.in-ar, html.in-ar body { background:transparent; }
   #ar .ui { pointer-events:auto; }
-  #topbar { position:absolute; top:0; left:0; right:0; padding:8px 10px env(safe-area-inset-top); display:flex; gap:8px; align-items:flex-start; }
+  #topbar { position:absolute; top:0; left:0; right:0; padding:calc(8px + env(safe-area-inset-top)) 10px 8px; display:flex; gap:8px; align-items:flex-start; }
   #status { flex:1; background:var(--panel); border-radius:10px; padding:8px 10px; font-size:14px; }
   #status.bad { background:rgba(150,20,20,.9); }
   #status.warn { background:rgba(140,90,0,.9); }
-  #mapWrapAR { width:42vw; max-width:260px; }
+  #btnHelp { flex:0 0 auto; min-width:48px; font-weight:700; }
+  #mapWrapAR { width:38vw; max-width:240px; }
   #mapWrapAR canvas { width:100%; aspect-ratio:1/1; background:rgba(8,10,14,.75); border-radius:10px; display:block; }
   #crosshair { position:absolute; left:50%; top:50%; width:28px; height:28px; margin:-14px 0 0 -14px; border:2px solid rgba(255,255,255,.85); border-radius:50%; }
   #crosshair::after { content:""; position:absolute; left:50%; top:50%; width:4px; height:4px; margin:-2px; background:#fff; border-radius:50%; }
-  #measure { position:absolute; left:50%; top:calc(50% + 24px); transform:translateX(-50%); background:var(--panel); border-radius:8px; padding:2px 8px; font-size:14px; display:none; }
+  #measure { position:absolute; left:50%; top:calc(50% + 24px); transform:translateX(-50%); background:var(--panel); border-radius:8px; padding:2px 8px; font-size:14px; display:none; white-space:nowrap; }
   #bottom { position:absolute; left:0; right:0; bottom:0; padding:8px 10px calc(10px + env(safe-area-inset-bottom)); background:linear-gradient(transparent, rgba(0,0,0,.55) 30%); }
-  #tabs { display:flex; gap:6px; margin-bottom:8px; }
-  #tabs button { flex:1; padding:8px; min-height:40px; }
+  #tabs { display:flex; gap:6px; margin-bottom:8px; overflow-x:auto; scrollbar-width:none; }
+  #tabs button { flex:1 0 auto; min-width:58px; padding:8px 6px; min-height:44px; font-size:14px; }
   #tabs button.on { background:var(--acc); color:#06121f; border-color:var(--acc); font-weight:600; }
   .modepanel { display:none; background:var(--panel); border-radius:12px; padding:10px; }
   .modepanel.on { display:block; }
-  .modepanel .row + .row { margin-top:8px; }
-  #toast { position:absolute; left:50%; top:30%; transform:translateX(-50%); background:rgba(0,0,0,.8); padding:8px 14px; border-radius:10px; display:none; font-size:15px; max-width:80vw; text-align:center; }
+  .modepanel .row + .row, .modepanel .row + .seg, .modepanel .seg + .row, .modepanel .mut + .row { margin-top:8px; }
+  #poleH { font-size:26px; font-weight:700; text-align:center; }
+  input[type=range] { width:100%; height:44px; }
+  #toast { position:absolute; left:50%; top:30%; transform:translateX(-50%); background:rgba(0,0,0,.85); padding:8px 14px; border-radius:10px; display:none; font-size:15px; max-width:84vw; text-align:center; }
+  /* ---- modal: top of the screen, opaque, never under the keyboard; capture is paused while open ---- */
+  #modal { display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.55); pointer-events:auto; }
+  #modal.on { display:block; }
+  #modal .sheet { position:absolute; top:calc(8px + env(safe-area-inset-top)); left:8px; right:8px; max-width:640px; margin:0 auto;
+    max-height:calc(var(--vvh) - 16px - env(safe-area-inset-top)); overflow:auto; background:#181d24; border:1px solid #3b4556; border-radius:14px; padding:12px; }
+  #mTitle { font-weight:700; margin-bottom:8px; }
+  #mChips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  #mChips button { flex:0 1 auto; min-height:44px; }
+  #mBody { font-size:15px; }
 </style>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
@@ -58,27 +79,36 @@
 <div id="app">
   <div id="landing">
     <h1>Floor plan capture</h1>
-    <div class="mut">Walk the house with the phone in AR: tap room corners on the floor, then the spot under each light. Everything stays on this phone until you save the file.</div>
+    <div class="mut">Walk the house with the phone in AR: mark rooms (corners or walls), doors, ceiling heights, lights, outlets and switches. Everything stays on this device until you save the file.</div>
     <section>
       <div class="row"><button id="btnStart" class="primary big" disabled>Start AR</button></div>
       <div id="support" class="mut" style="margin-top:6px">Checking AR support…</div>
+      <div id="linkNote" class="mut" style="margin-top:6px"></div>
+    </section>
+    <section class="help">
+      <details id="helpDetails"><summary>How to scan</summary><div id="helpLanding"></div></details>
     </section>
     <section>
-      <h2>Map</h2>
-      <div id="mapWrapLanding"></div>
+      <h2>Plan (edit)</h2>
+      <div class="mut">Drag lights, outlets, door ends and corners; tap a room, wall or item to edit it. Pinch or wheel to zoom, drag empty space to pan.</div>
+      <canvas id="editCanvas" style="margin-top:8px"></canvas>
+      <div class="row" style="margin-top:8px">
+        <button id="btnEdUndo" class="narrow">Undo</button>
+        <button id="btnEdFit" class="narrow">Fit</button>
+        <button id="btnEdSquare">Square walls</button>
+      </div>
+      <div id="selPanel" class="mut">Nothing selected.</div>
       <div id="planSummary" class="mut" style="margin-top:6px"></div>
       <div class="row" style="margin-top:8px">
         <button id="btnSave" class="primary">Save plan file</button>
-        <label class="row" style="flex:0 1 auto"><button id="btnLoadPlanProxy">Load plan file</button></label>
+        <button id="btnLoadPlanProxy">Load plan file</button>
         <input id="filePlan" type="file" accept=".json,application/json" hidden>
       </div>
-      <div class="row" style="margin-top:8px">
-        <button id="btnClear">Start over (clear plan)</button>
-      </div>
+      <div class="row" style="margin-top:8px"><button id="btnClear" class="danger">Start over (clear plan)</button></div>
     </section>
     <section>
-      <h2>Lights list</h2>
-      <div class="mut">Load the <b>lights.json</b> file you copied to the phone, or type names (one per line, e.g. <code>light.kitchen_ceiling</code> or <code>Kitchen ceiling</code>).</div>
+      <h2>Lights and switches list</h2>
+      <div class="mut">Open the link made by <code>floorplan_link.py</code> on the PC (fills this in automatically), or load <b>lights.json</b>, or type names (one per line, e.g. <code>light.kitchen_ceiling</code> or <code>Kitchen ceiling</code>).</div>
       <div class="row" style="margin-top:8px">
         <button id="btnLoadLightsProxy">Load lights.json</button>
         <input id="fileLights" type="file" accept=".json,application/json" hidden>
@@ -95,44 +125,83 @@
     <div id="toast"></div>
     <div id="topbar">
       <div id="status" class="ui">Starting…</div>
+      <button id="btnHelp" class="ui">?</button>
       <div id="mapWrapAR" class="ui"></div>
     </div>
     <div id="bottom" class="ui">
       <div id="tabs">
         <button data-mode="room">Room</button>
-        <button data-mode="light">Light</button>
         <button data-mode="door">Door</button>
+        <button data-mode="ceiling">Ceiling</button>
+        <button data-mode="light">Light</button>
+        <button data-mode="item">Outlet…</button>
         <button data-mode="align">Align</button>
         <button id="btnExit">Exit</button>
       </div>
       <div class="modepanel" data-panel="room">
         <div id="roomIdle">
-          <div class="row"><input id="roomName" type="text" list="areaList" placeholder="Room name"><datalist id="areaList"></datalist></div>
-          <div class="row"><button id="btnRoomStart" class="primary">Start room</button></div>
+          <div id="roomIdleInfo" class="mut"></div>
+          <div class="row"><button id="btnRoomStart" class="primary big">New room…</button></div>
         </div>
         <div id="roomActive" style="display:none">
           <div id="roomInfo" class="mut"></div>
+          <div class="seg" style="margin-top:8px"><button id="segCorner" data-tool="corner">Corner</button><button id="segWall" data-tool="wall">Wall (2 points)</button></div>
           <div class="row"><button id="btnCorner" class="primary big">Add corner</button></div>
           <div class="row"><button id="btnUndo">Undo</button><button id="btnClose">Close room</button><button id="btnCancelRoom">Cancel</button></div>
         </div>
       </div>
+      <div class="modepanel" data-panel="ceiling">
+        <div class="row"><select id="ceilRoom"></select></div>
+        <div id="ceilMain">
+          <div id="ceilInfo" class="mut" style="margin-top:6px"></div>
+          <div class="row"><button id="btnCeilUse" class="primary">Use detected</button><button id="btnPole">Pole</button><button id="btnCeilType" class="narrow">Type</button></div>
+        </div>
+        <div id="poleUI" style="display:none">
+          <div class="mut" style="margin-top:6px">Raise the pole until its top touches the ceiling (step back to see both ends).</div>
+          <div id="poleH">2.40 m</div>
+          <div class="row"><button data-d="-0.05">−5 cm</button><button data-d="-0.01">−1</button><button data-d="0.01">+1</button><button data-d="0.05">+5 cm</button></div>
+          <input id="poleRange" type="range" min="1.5" max="5" step="0.01" value="2.4">
+          <div class="row"><button id="btnPoleSave" class="primary">Save height</button><button id="btnPoleCancel" class="narrow">Cancel</button></div>
+        </div>
+      </div>
       <div class="modepanel" data-panel="light">
         <div class="row"><select id="lightSelect"></select></div>
-        <div class="row"><input id="lightCustom" type="text" placeholder="…or type a name"></div>
-        <div class="row"><button id="btnLight" class="primary big">Place light here</button><button id="btnLightUndo" style="flex:0 1 auto">Undo</button></div>
+        <div class="row"><button id="btnLight" class="primary big">Place light here</button><button id="btnLightType" class="narrow">Type…</button><button id="btnLightUndo" class="narrow">Undo</button></div>
+      </div>
+      <div class="modepanel" data-panel="item">
+        <div class="seg"><button data-item="outlet">Outlet</button><button data-item="switch">Switch</button><button data-item="other">Other</button></div>
+        <div class="row" id="plugRow"><select id="plugSelect"></select></div>
+        <div id="itemInfo" class="mut"></div>
+        <div class="row"><button id="btnItem" class="primary big">Place outlet</button><button id="btnItemUndo" class="narrow">Undo</button></div>
       </div>
       <div class="modepanel" data-panel="door">
-        <div id="doorInfo" class="mut">Aim at one side of the doorway on the floor.</div>
-        <div class="row"><button id="btnDoor" class="primary big">Door side 1</button><button id="btnDoorUndo" style="flex:0 1 auto">Undo</button></div>
+        <div class="seg"><button data-door="door">Door</button><button data-door="opening">Opening</button></div>
+        <div id="doorInfo" class="mut"></div>
+        <div class="row"><button id="btnDoor" class="primary big">Side 1</button><button id="btnDoorUndo" class="narrow">Undo</button></div>
+        <div id="swingRow" style="display:none">
+          <div class="mut" style="margin-top:6px">Optional — hinge side and which way it opens:</div>
+          <div class="row"><button data-hinge="a">Hinge side 1</button><button data-hinge="b">Hinge side 2</button></div>
+          <div class="row"><button data-swing="toward">Opens toward me</button><button data-swing="away">Opens away</button></div>
+        </div>
       </div>
       <div class="modepanel" data-panel="align">
         <div id="alignInfo" class="mut"></div>
         <div class="row"><select id="alignRoom"></select></div>
-        <div class="row"><button id="btnAlign" class="primary big">Mark A</button><button id="btnAlignSkip" style="flex:0 1 auto">Skip</button></div>
+        <div class="row"><button id="btnAlign" class="primary big">Mark A</button><button id="btnAlignSkip" class="narrow">Skip</button></div>
       </div>
     </div>
   </div>
+
+  <div id="modal" class="ui">
+    <div class="sheet">
+      <div id="mTitle"></div>
+      <div id="mBody"></div>
+      <input id="mInput" type="text" autocomplete="off" style="margin-top:8px">
+      <div id="mChips"></div>
+      <div class="row" style="margin-top:10px"><button id="mCancel">Cancel</button><button id="mOk" class="primary">OK</button></div>
+    </div>
+  </div>
 </div>
-<script type="module" src="./app.js"></script>
+<script type="module" src="./app.js?v=2"></script>
 </body>
 </html>
