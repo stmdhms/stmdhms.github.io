@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Floor Plan Capture</title>
+<meta name="robots" content="noindex">
+<style>
+  :root { --bg:#111418; --panel:rgba(20,24,30,.86); --fg:#eef1f5; --mut:#9aa4b2; --acc:#4fa3ff; --ok:#3fcf7f; --warn:#ffb020; --bad:#ff5a5a; --light:#ffd84a; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.4 system-ui, -apple-system, Roboto, sans-serif; }
+  button, select, input, textarea { font:inherit; color:inherit; }
+  button { background:#2a3240; border:1px solid #3b4556; border-radius:10px; padding:10px 14px; min-height:44px; }
+  button.primary { background:var(--acc); border-color:var(--acc); color:#06121f; font-weight:600; }
+  button.big { font-size:20px; padding:14px 22px; min-height:58px; }
+  button:disabled { opacity:.4; }
+  select, input[type=text], textarea { background:#1b2129; border:1px solid #3b4556; border-radius:10px; padding:10px; min-height:44px; width:100%; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row > * { flex:1 1 auto; }
+  .mut { color:var(--mut); font-size:14px; }
+  #app { min-height:100vh; }
+  /* ---- landing ---- */
+  #landing { padding:16px; max-width:640px; margin:0 auto; }
+  #landing h1 { font-size:22px; margin:8px 0 4px; }
+  #landing section { background:#181d24; border:1px solid #262e3a; border-radius:14px; padding:12px; margin:12px 0; }
+  #landing h2 { font-size:16px; margin:0 0 8px; }
+  #mapWrapLanding canvas { width:100%; aspect-ratio:1/1; background:#0c0f13; border-radius:10px; display:block; }
+  ul.items { margin:6px 0 0; padding-left:18px; font-size:14px; }
+  /* ---- AR overlay ---- */
+  #ar { display:none; position:fixed; inset:0; pointer-events:none; }
+  #app.in-ar #landing { display:none; }
+  #app.in-ar #ar { display:block; }
+  #app.in-ar, html.in-ar body { background:transparent; }
+  #ar .ui { pointer-events:auto; }
+  #topbar { position:absolute; top:0; left:0; right:0; padding:8px 10px env(safe-area-inset-top); display:flex; gap:8px; align-items:flex-start; }
+  #status { flex:1; background:var(--panel); border-radius:10px; padding:8px 10px; font-size:14px; }
+  #status.bad { background:rgba(150,20,20,.9); }
+  #status.warn { background:rgba(140,90,0,.9); }
+  #mapWrapAR { width:42vw; max-width:260px; }
+  #mapWrapAR canvas { width:100%; aspect-ratio:1/1; background:rgba(8,10,14,.75); border-radius:10px; display:block; }
+  #crosshair { position:absolute; left:50%; top:50%; width:28px; height:28px; margin:-14px 0 0 -14px; border:2px solid rgba(255,255,255,.85); border-radius:50%; }
+  #crosshair::after { content:""; position:absolute; left:50%; top:50%; width:4px; height:4px; margin:-2px; background:#fff; border-radius:50%; }
+  #measure { position:absolute; left:50%; top:calc(50% + 24px); transform:translateX(-50%); background:var(--panel); border-radius:8px; padding:2px 8px; font-size:14px; display:none; }
+  #bottom { position:absolute; left:0; right:0; bottom:0; padding:8px 10px calc(10px + env(safe-area-inset-bottom)); background:linear-gradient(transparent, rgba(0,0,0,.55) 30%); }
+  #tabs { display:flex; gap:6px; margin-bottom:8px; }
+  #tabs button { flex:1; padding:8px; min-height:40px; }
+  #tabs button.on { background:var(--acc); color:#06121f; border-color:var(--acc); font-weight:600; }
+  .modepanel { display:none; background:var(--panel); border-radius:12px; padding:10px; }
+  .modepanel.on { display:block; }
+  .modepanel .row + .row { margin-top:8px; }
+  #toast { position:absolute; left:50%; top:30%; transform:translateX(-50%); background:rgba(0,0,0,.8); padding:8px 14px; border-radius:10px; display:none; font-size:15px; max-width:80vw; text-align:center; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="app">
+  <div id="landing">
+    <h1>Floor plan capture</h1>
+    <div class="mut">Walk the house with the phone in AR: tap room corners on the floor, then the spot under each light. Everything stays on this phone until you save the file.</div>
+    <section>
+      <div class="row"><button id="btnStart" class="primary big" disabled>Start AR</button></div>
+      <div id="support" class="mut" style="margin-top:6px">Checking AR support…</div>
+    </section>
+    <section>
+      <h2>Map</h2>
+      <div id="mapWrapLanding"></div>
+      <div id="planSummary" class="mut" style="margin-top:6px"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnSave" class="primary">Save plan file</button>
+        <label class="row" style="flex:0 1 auto"><button id="btnLoadPlanProxy">Load plan file</button></label>
+        <input id="filePlan" type="file" accept=".json,application/json" hidden>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnClear">Start over (clear plan)</button>
+      </div>
+    </section>
+    <section>
+      <h2>Lights list</h2>
+      <div class="mut">Load the <b>lights.json</b> file you copied to the phone, or type names (one per line, e.g. <code>light.kitchen_ceiling</code> or <code>Kitchen ceiling</code>).</div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnLoadLightsProxy">Load lights.json</button>
+        <input id="fileLights" type="file" accept=".json,application/json" hidden>
+      </div>
+      <textarea id="typedLights" rows="3" placeholder="light.kitchen_ceiling" style="margin-top:8px"></textarea>
+      <div class="row" style="margin-top:8px"><button id="btnAddTyped">Add typed names</button><button id="btnClearLights">Clear list</button></div>
+      <div id="lightsSummary" class="mut" style="margin-top:6px"></div>
+    </section>
+  </div>
+
+  <div id="ar">
+    <div id="crosshair"></div>
+    <div id="measure"></div>
+    <div id="toast"></div>
+    <div id="topbar">
+      <div id="status" class="ui">Starting…</div>
+      <div id="mapWrapAR" class="ui"></div>
+    </div>
+    <div id="bottom" class="ui">
+      <div id="tabs">
+        <button data-mode="room">Room</button>
+        <button data-mode="light">Light</button>
+        <button data-mode="door">Door</button>
+        <button data-mode="align">Align</button>
+        <button id="btnExit">Exit</button>
+      </div>
+      <div class="modepanel" data-panel="room">
+        <div id="roomIdle">
+          <div class="row"><input id="roomName" type="text" list="areaList" placeholder="Room name"><datalist id="areaList"></datalist></div>
+          <div class="row"><button id="btnRoomStart" class="primary">Start room</button></div>
+        </div>
+        <div id="roomActive" style="display:none">
+          <div id="roomInfo" class="mut"></div>
+          <div class="row"><button id="btnCorner" class="primary big">Add corner</button></div>
+          <div class="row"><button id="btnUndo">Undo</button><button id="btnClose">Close room</button><button id="btnCancelRoom">Cancel</button></div>
+        </div>
+      </div>
+      <div class="modepanel" data-panel="light">
+        <div class="row"><select id="lightSelect"></select></div>
+        <div class="row"><input id="lightCustom" type="text" placeholder="…or type a name"></div>
+        <div class="row"><button id="btnLight" class="primary big">Place light here</button><button id="btnLightUndo" style="flex:0 1 auto">Undo</button></div>
+      </div>
+      <div class="modepanel" data-panel="door">
+        <div id="doorInfo" class="mut">Aim at one side of the doorway on the floor.</div>
+        <div class="row"><button id="btnDoor" class="primary big">Door side 1</button><button id="btnDoorUndo" style="flex:0 1 auto">Undo</button></div>
+      </div>
+      <div class="modepanel" data-panel="align">
+        <div id="alignInfo" class="mut"></div>
+        <div class="row"><select id="alignRoom"></select></div>
+        <div class="row"><button id="btnAlign" class="primary big">Mark A</button><button id="btnAlignSkip" style="flex:0 1 auto">Skip</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
